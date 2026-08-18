@@ -5,7 +5,6 @@ from flask import Flask, jsonify
 
 app = Flask(__name__)
 
-# Ta clé ScraperAPI configurée
 SCRAPER_API_KEY = "e8e19b22c8e960d28f5acaf41a191e11"
 
 
@@ -14,50 +13,42 @@ def get_annonces():
     target_url = (
         "https://www.ouestfrance-immo.com/acheteur/vente/vannes-56-56000/"
     )
-    # Requête passant par le proxy résidentiel de ScraperAPI
-    api_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}"
+    # render=true force ScraperAPI a exécuter le JavaScript de la page
+    api_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}&render=true"
 
     annonces = []
 
     try:
-        response = requests.get(api_url, timeout=30)
+        response = requests.get(api_url, timeout=60)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
-            cards = soup.select(".annCard, .ann-card, article")
-            for card in cards:
-                link_tag = card.find("a", href=True)
-                title_tag = card.select_one(".annTitre, .ann-title, h2, h3")
-                price_tag = card.select_one(".annPrix, .ann-price, .price")
 
-                if link_tag:
-                    href = link_tag["href"]
+            # Recherche de tous les liens pointant vers une fiche produit/annonce
+            for a_tag in soup.find_all("a", href=True):
+                href = a_tag["href"]
+                if "/immobilier/vente/" in href or "/annonce-" in href:
                     full_url = (
                         href
                         if href.startswith("http")
                         else f"https://www.ouestfrance-immo.com{href}"
                     )
-                    title = (
-                        title_tag.get_text(strip=True)
-                        if title_tag
-                        else "Bien à vendre - Vannes"
-                    )
-                    price = (
-                        price_tag.get_text(strip=True) if price_tag else "N/C"
-                    )
+                    title = a_tag.get_text(strip=True)
 
-                    annonces.append(
-                        {
-                            "source": "Ouest-France Immo",
-                            "titre": title,
-                            "prix": price,
-                            "ville": "Vannes",
-                            "url": full_url,
-                        }
-                    )
+                    if len(title) > 10 and not any(
+                        x["url"] == full_url for x in annonces
+                    ):
+                        annonces.append(
+                            {
+                                "source": "Ouest-France Immo",
+                                "titre": title,
+                                "prix": "Voir annonce",
+                                "ville": "Vannes",
+                                "url": full_url,
+                            }
+                        )
     except Exception as e:
         print(f"Erreur API ScraperAPI : {e}")
 
-    # Valeur de secours si la réponse est vide
     if not annonces:
         annonces = [
             {
