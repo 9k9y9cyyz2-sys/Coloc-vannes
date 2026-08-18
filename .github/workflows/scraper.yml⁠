@@ -1,0 +1,30 @@
+name: Veille Immo Coloc
+
+on:
+  schedule:
+    # S'exécute automatiquement toutes les 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Permet d'exécuter manuellement si besoin
+
+jobs:
+  update-annonces:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v3
+
+      - name: Configurer Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Executer la veille
+        run: |
+          python -c "print('Veille exécutée')"
+
+      - name: Mettre à jour l'application
+        run: |
+          git config --global user.name 'bot-github'
+          git config --global user.email 'bot@github.com'
+          git add .
+          git diff-index --quiet HEAD || git commit -m "Mise à jour des annonces" && git push
