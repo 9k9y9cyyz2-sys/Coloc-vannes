@@ -1,66 +1,34 @@
 import json
-import re
-import xml.etree.ElementTree as ET
 import requests
 
-# Instances RSS-Bridge publiques réparties (permettent de contourner les blocages)
-INSTANCES = [
-    "https://rss-bridge.org/bridge01",
-    "https://bridge.prontos.de",
-    "https://rss.b33.mobi",
-]
+# URL de ton micro-serveur sur Render
+RENDER_URL = "https://coloc-vannes.onrender.com/annonces"
 
 
-def fetch_ventes_vannes_rss():
-    annonces = []
-
-    # Exemple avec le flux RSS d'agrégation d'annonces
-    # (ou via un pont RSS-Bridge pré-configuré pour Vannes)
-    url_target = "https://www.paruvendu.fr/immobilier/rss/vente/vannes-56000/"
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-
+def fetch_from_render():
     try:
-        response = requests.get(url_target, headers=headers, timeout=10)
+        response = requests.get(RENDER_URL, timeout=30)
         if response.status_code == 200:
-            root = ET.fromstring(response.content)
-            for item in root.findall(".//item"):
-                title = item.findtext("title", "")
-                link = item.findtext("link", "")
-                pub_date = item.findtext("pubDate", "")
-
-                # Extraction du prix dans le titre
-                prix_search = re.search(r"(\d[\d\s]*\d)\s*€", title)
-                prix = (
-                    f"{prix_search.group(1).replace(' ', '')} €"
-                    if prix_search
-                    else "Consulter"
-                )
-
-                if link:
-                    annonces.append(
-                        {
-                            "source": "ParuVendu (Vente)",
-                            "titre": title,
-                            "prix": prix,
-                            "ville": "Vannes",
-                            "url": link,
-                            "date": pub_date[:16] if pub_date else "",
-                        }
-                    )
+            return response.json()
+        print(f"Erreur HTTP : {response.status_code}")
     except Exception as e:
-        print(f"Erreur lors de la récupération du flux : {e}")
+        print(f"Erreur de connexion à Render : {e}")
 
-    return annonces
+    # Fallback si le serveur Render dort ou ne répond pas immédiatement
+    return [
+        {
+            "source": "Ouest-France Immo",
+            "titre": "Consulter les ventes à Vannes",
+            "prix": "Consulter",
+            "ville": "Vannes",
+            "url": "https://www.ouestfrance-immo.com/acheteur/vente/vannes-56-56000/",
+        }
+    ]
 
 
 if __name__ == "__main__":
-    results = fetch_ventes_vannes_rss()
-
-    # Sauvegarde dans annonces.json
+    data = fetch_from_render()
     with open("annonces.json", "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-    print(f"Succès : {len(results)} ventes enregistrées.")
+    print(f"Enregistré : {len(data)} annonces depuis Render.")
