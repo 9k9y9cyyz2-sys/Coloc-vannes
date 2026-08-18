@@ -4,7 +4,7 @@ on:
   schedule:
     # S'exécute automatiquement toutes les 30 minutes
     - cron: '*/30 * * * *'
-  workflow_dispatch: # Permet d'exécuter manuellement si besoin
+workflow_dispatch: # Permet d'exécuter manuellement si besoin
 
 jobs:
   update-annonces:
