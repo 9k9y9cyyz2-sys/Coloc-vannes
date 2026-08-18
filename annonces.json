@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "source": "Recherche Vannes",
+    "titre": "Voir toutes les colocations disponibles sur Ouest-France Immo (Vannes)",
+    "prix": "Consulter",
+    "ville": "Vannes",
+    "url": "https://www.ouestfrance-immo.com/immobilier/location/colocation/vannes-56-56000/"
+  },
+  {
+    "source": "Recherche Vannes",
+    "titre": "Voir les petites annonces de colocation sur ParuVendu (Vannes)",
+    "prix": "Consulter",
+    "ville": "Vannes",
+    "url": "https://www.paruvendu.fr/immobilier/location/vannes-56000/"
+  }
+]
