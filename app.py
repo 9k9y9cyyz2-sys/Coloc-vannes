@@ -1,67 +1,53 @@
 import os
 import requests
-from bs4 import BeautifulSoup
 from flask import Flask, jsonify
 
 app = Flask(__name__)
 
 SCRAPER_API_KEY = "e8e19b22c8e960d28f5acaf41a191e11"
 
-
 @app.route("/annonces")
 def get_annonces():
-    target_url = (
-        "https://www.ouestfrance-immo.com/acheteur/vente/vannes-56-56000/"
-    )
-    # render=true force ScraperAPI a exécuter le JavaScript de la page
-    api_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}&render=true"
-
+    # URL de l'API publique de Bien'Ici pour les ventes à Vannes
+    target_url = "https://www.bienici.com/realEstateAds.json?filters=%7B%22size%22%3A20%2C%22from%22%3A0%2C%22filterType%22%3A%22buy%22%2C%22propertyType%22%3A%5B%22house%22%2C%22flat%22%5D%2C%22zoneIdsByTypes%22%3A%7B%22zoneIds%22%3A%5B%22zone%3Acity%3A56260%22%5D%7D%7D"
+    
+    # Appel via ScraperAPI (sans JS pour rester ultra rapide)
+    api_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}"
+    
     annonces = []
-
+    
     try:
-        response = requests.get(api_url, timeout=60)
+        response = requests.get(api_url, timeout=25)
         if response.status_code == 200:
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            # Recherche de tous les liens pointant vers une fiche produit/annonce
-            for a_tag in soup.find_all("a", href=True):
-                href = a_tag["href"]
-                if "/immobilier/vente/" in href or "/annonce-" in href:
-                    full_url = (
-                        href
-                        if href.startswith("http")
-                        else f"https://www.ouestfrance-immo.com{href}"
-                    )
-                    title = a_tag.get_text(strip=True)
-
-                    if len(title) > 10 and not any(
-                        x["url"] == full_url for x in annonces
-                    ):
-                        annonces.append(
-                            {
-                                "source": "Ouest-France Immo",
-                                "titre": title,
-                                "prix": "Voir annonce",
-                                "ville": "Vannes",
-                                "url": full_url,
-                            }
-                        )
+            data = response.json()
+            for ad in data.get("realEstateAds", []):
+                price = ad.get("price", "N/C")
+                price_str = f"{price:,} €".replace(",", " ") if isinstance(price, (int, float)) else "N/C"
+                
+                title = ad.get("title") or f"{ad.get('propertyType', 'Bien').capitalize()} {ad.get('surfaceArea', '')} m²"
+                id_ad = ad.get("id", "")
+                
+                annonces.append({
+                    "source": "Bien'Ici",
+                    "titre": title,
+                    "prix": price_str,
+                    "ville": "Vannes",
+                    "url": f"https://www.bienici.com/annonce/{id_ad}"
+                })
     except Exception as e:
-        print(f"Erreur API ScraperAPI : {e}")
+        print(f"Erreur : {e}")
 
+    # Fallback uniquement si échec complet
     if not annonces:
-        annonces = [
-            {
-                "source": "Ouest-France Immo",
-                "titre": "Consulter les ventes à Vannes",
-                "prix": "Consulter",
-                "ville": "Vannes",
-                "url": "https://www.ouestfrance-immo.com/acheteur/vente/vannes-56-56000/",
-            }
-        ]
+        annonces = [{
+            "source": "Bien'Ici",
+            "titre": "Consulter les ventes à Vannes",
+            "prix": "Consulter",
+            "ville": "Vannes",
+            "url": "https://www.bienici.com/recherche/achat/vannes-56000"
+        }]
 
     return jsonify(annonces)
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
