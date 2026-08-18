@@ -5,18 +5,22 @@ from flask import Flask, jsonify
 
 app = Flask(__name__)
 
+# Ta clé ScraperAPI configurée
+SCRAPER_API_KEY = "e8e19b22c8e960d28f5acaf41a191e11"
+
 
 @app.route("/annonces")
 def get_annonces():
-    url = "https://www.ouestfrance-immo.com/acheteur/vente/vannes-56-56000/"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "fr-FR,fr;q=0.9",
-    }
+    target_url = (
+        "https://www.ouestfrance-immo.com/acheteur/vente/vannes-56-56000/"
+    )
+    # Requête passant par le proxy résidentiel de ScraperAPI
+    api_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}"
+
     annonces = []
 
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(api_url, timeout=30)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
             cards = soup.select(".annCard, .ann-card, article")
@@ -51,14 +55,14 @@ def get_annonces():
                         }
                     )
     except Exception as e:
-        print(f"Erreur serveur : {e}")
+        print(f"Erreur API ScraperAPI : {e}")
 
-    # Fallback pour ne jamais renvoyer un JSON vide
+    # Valeur de secours si la réponse est vide
     if not annonces:
         annonces = [
             {
                 "source": "Ouest-France Immo",
-                "titre": "Voir les ventes immobilières à Vannes",
+                "titre": "Consulter les ventes à Vannes",
                 "prix": "Consulter",
                 "ville": "Vannes",
                 "url": "https://www.ouestfrance-immo.com/acheteur/vente/vannes-56-56000/",
