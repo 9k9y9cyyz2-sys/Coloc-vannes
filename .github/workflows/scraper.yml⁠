@@ -1,30 +1,33 @@
 name: Veille Immo Coloc
 
 on:
-  schedule:
-    # S'exécute automatiquement toutes les 30 minutes
+schedule:
     - cron: '*/30 * * * *'
-workflow_dispatch: # Permet d'exécuter manuellement si besoin
+workflow_dispatch:
 
 jobs:
   update-annonces:
     runs-on: ubuntu-latest
     steps:
       - name: Récupérer le code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configurer Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.x'
 
-      - name: Executer la veille
+      - name: Installer les dépendances
         run: |
-          python -c "print('Veille exécutée')"
+          pip install requests beautifulsoup4
 
-      - name: Mettre à jour l'application
+      - name: Exécuter le script
+        run: python scraper.py
+
+      - name: Mettre à jour les données
         run: |
-          git config --global user.name 'bot-github'
-          git config --global user.email 'bot@github.com'
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add .
-          git diff-index --quiet HEAD || git commit -m "Mise à jour des annonces" && git push
+          git diff --staged --quiet || git commit -m "Mise à jour automatique des annonces"
+          git push
