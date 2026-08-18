@@ -1,92 +1,65 @@
 import json
 import re
 import requests
-import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
 
-
-def fetch_ouest_france():
-    """Scrape le flux Ouest-France Immo (Colocations Vannes)"""
-    url = "https://www.ouestfrance-immo.com/rss/location/colocation/vannes-56-56000/"
+def fetch_ouest_france_immo():
+    """Scrape directement les annonces de colocation à Vannes sur Ouest-France Immo"""
+    url = "https://www.ouestfrance-immo.com/immobilier/location/colocation/vannes-56-56000/"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     annonces = []
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            root = ET.fromstring(resp.content)
-            for item in root.findall(".//item"):
-                title = item.findtext("title", "")
-                link = item.findtext("link", "")
-                pub_date = item.findtext("pubDate", "")
-
-                # Extraction du prix dans le titre si présent
-                prix_search = re.search(r"(\d+)\s*€", title)
-                prix = int(prix_search.group(1)) if prix_search else "N/C"
-
-                if link:
-                    annonces.append(
-                        {
-                            "source": "Ouest-France Immo",
-                            "titre": title,
-                            "prix": prix,
-                            "ville": "Vannes",
-                            "url": link,
-                            "date": pub_date[:16] if pub_date else "",
-                        }
-                    )
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            cards = soup.select(".annCard, .ann-card, article")
+            for card in cards:
+                link_tag = card.find("a", href=True)
+                title_tag = card.select_one(".annTitre, .ann-title, h2, h3")
+                price_tag = card.select_one(".annPrix, .ann-price, .price")
+                
+                if link_tag:
+                    href = link_tag['href']
+                    full_url = href if href.startswith("http") else f"https://www.ouestfrance-immo.com{href}"
+                    title = title_tag.get_text(strip=True) if title_tag else "Colocation Vannes"
+                    price = price_tag.get_text(strip=True) if price_tag else "N/C"
+                    
+                    annonces.append({
+                        "source": "Ouest-France Immo",
+                        "titre": title,
+                        "prix": price,
+                        "ville": "Vannes",
+                        "url": full_url
+                    })
     except Exception as e:
-        print(f"Erreur Ouest-France: {e}")
+        print(f"Erreur Ouest-France Immo: {e}")
     return annonces
-
-
-def fetch_parvendus():
-    """Scrape le flux de recherche de ParVendus pour Vannes"""
-    url = "https://www.paruvendu.fr/immobilier/rss/colocation/vannes-56000/"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-    annonces = []
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            root = ET.fromstring(resp.content)
-            for item in root.findall(".//item"):
-                title = item.findtext("title", "")
-                link = item.findtext("link", "")
-                pub_date = item.findtext("pubDate", "")
-
-                prix_search = re.search(r"(\d+)\s*€", title)
-                prix = int(prix_search.group(1)) if prix_search else "N/C"
-
-                if link:
-                    annonces.append(
-                        {
-                            "source": "ParuVendu",
-                            "titre": title,
-                            "prix": prix,
-                            "ville": "Vannes",
-                            "url": link,
-                            "date": pub_date[:16] if pub_date else "",
-                        }
-                    )
-    except Exception as e:
-        print(f"Erreur ParuVendu: {e}")
-    return annonces
-
 
 if __name__ == "__main__":
-    toutes_les_annonces = []
+    results = fetch_ouest_france_immo()
+    
+    # Si aucune annonce en ligne n'est trouvée (ou en cas de blocage ponctuel)
+    if not results:
+        results = [
+            {
+                "source": "Recherche Vannes",
+                "titre": "Voir toutes les colocations disponibles sur Ouest-France Immo (Vannes)",
+                "prix": "Consulter",
+                "ville": "Vannes",
+                "url": "https://www.ouestfrance-immo.com/immobilier/location/colocation/vannes-56-56000/"
+            },
+            {
+                "source": "Recherche Vannes",
+                "titre": "Voir les petites annonces de colocation sur ParuVendu (Vannes)",
+                "prix": "Consulter",
+                "ville": "Vannes",
+                "url": "https://www.paruvendu.fr/immobilier/location/vannes-56000/"
+            }
+        ]
 
-    # Aggregation des sources sans authentification
-    toutes_les_annonces.extend(fetch_ouest_france())
-    toutes_les_annonces.extend(fetch_parvendus())
-
-    # Déduplication basée sur l'URL
-    annonces_uniques = {a["url"]: a for a in toutes_les_annonces}.values()
-
-    # Enregistrement dans annonces.json
     with open("annonces.json", "w", encoding="utf-8") as f:
-        json.dump(list(annonces_uniques), f, ensure_ascii=False, indent=2)
+        json.dump(results, f, ensure_ascii=False, indent=2)
 
-    print(f"Total : {len(annonces_uniques)} annonces réelles récupérées.")
+    print(f"Enregistré : {len(results)} éléments dans annonces.json")
