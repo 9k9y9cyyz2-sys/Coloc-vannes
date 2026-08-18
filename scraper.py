@@ -1,65 +1,66 @@
 import json
 import re
+import xml.etree.ElementTree as ET
 import requests
-from bs4 import BeautifulSoup
 
-def fetch_ouest_france_immo():
-    """Scrape directement les annonces de colocation à Vannes sur Ouest-France Immo"""
-    url = "https://www.ouestfrance-immo.com/immobilier/location/colocation/vannes-56-56000/"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
+# Instances RSS-Bridge publiques réparties (permettent de contourner les blocages)
+INSTANCES = [
+    "https://rss-bridge.org/bridge01",
+    "https://bridge.prontos.de",
+    "https://rss.b33.mobi",
+]
+
+
+def fetch_ventes_vannes_rss():
     annonces = []
+
+    # Exemple avec le flux RSS d'agrégation d'annonces
+    # (ou via un pont RSS-Bridge pré-configuré pour Vannes)
+    url_target = "https://www.paruvendu.fr/immobilier/rss/vente/vannes-56000/"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url_target, headers=headers, timeout=10)
         if response.status_code == 200:
-            soup = BeautifulSoup(response.text, "html.parser")
-            cards = soup.select(".annCard, .ann-card, article")
-            for card in cards:
-                link_tag = card.find("a", href=True)
-                title_tag = card.select_one(".annTitre, .ann-title, h2, h3")
-                price_tag = card.select_one(".annPrix, .ann-price, .price")
-                
-                if link_tag:
-                    href = link_tag['href']
-                    full_url = href if href.startswith("http") else f"https://www.ouestfrance-immo.com{href}"
-                    title = title_tag.get_text(strip=True) if title_tag else "Colocation Vannes"
-                    price = price_tag.get_text(strip=True) if price_tag else "N/C"
-                    
-                    annonces.append({
-                        "source": "Ouest-France Immo",
-                        "titre": title,
-                        "prix": price,
-                        "ville": "Vannes",
-                        "url": full_url
-                    })
+            root = ET.fromstring(response.content)
+            for item in root.findall(".//item"):
+                title = item.findtext("title", "")
+                link = item.findtext("link", "")
+                pub_date = item.findtext("pubDate", "")
+
+                # Extraction du prix dans le titre
+                prix_search = re.search(r"(\d[\d\s]*\d)\s*€", title)
+                prix = (
+                    f"{prix_search.group(1).replace(' ', '')} €"
+                    if prix_search
+                    else "Consulter"
+                )
+
+                if link:
+                    annonces.append(
+                        {
+                            "source": "ParuVendu (Vente)",
+                            "titre": title,
+                            "prix": prix,
+                            "ville": "Vannes",
+                            "url": link,
+                            "date": pub_date[:16] if pub_date else "",
+                        }
+                    )
     except Exception as e:
-        print(f"Erreur Ouest-France Immo: {e}")
+        print(f"Erreur lors de la récupération du flux : {e}")
+
     return annonces
 
-if __name__ == "__main__":
-    results = fetch_ouest_france_immo()
-    
-    # Si aucune annonce en ligne n'est trouvée (ou en cas de blocage ponctuel)
-    if not results:
-        results = [
-            {
-                "source": "Recherche Vannes",
-                "titre": "Voir toutes les colocations disponibles sur Ouest-France Immo (Vannes)",
-                "prix": "Consulter",
-                "ville": "Vannes",
-                "url": "https://www.ouestfrance-immo.com/immobilier/location/colocation/vannes-56-56000/"
-            },
-            {
-                "source": "Recherche Vannes",
-                "titre": "Voir les petites annonces de colocation sur ParuVendu (Vannes)",
-                "prix": "Consulter",
-                "ville": "Vannes",
-                "url": "https://www.paruvendu.fr/immobilier/location/vannes-56000/"
-            }
-        ]
 
+if __name__ == "__main__":
+    results = fetch_ventes_vannes_rss()
+
+    # Sauvegarde dans annonces.json
     with open("annonces.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 
-    print(f"Enregistré : {len(results)} éléments dans annonces.json")
+    print(f"Succès : {len(results)} ventes enregistrées.")
