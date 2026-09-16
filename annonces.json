@@ -1,9 +1,9 @@
 [
   {
-    "source": "Ouest-France Immo",
-    "titre": "Consulter les ventes à Vannes",
     "prix": "Consulter",
-    "ville": "Vannes",
-    "url": "https://www.ouestfrance-immo.com/acheteur/vente/vannes-56-56000/"
+    "source": "Bien'Ici",
+    "titre": "Consulter les ventes à Vannes",
+    "url": "https://www.bienici.com/recherche/achat/vannes-56000",
+    "ville": "Vannes"
   }
 ]
